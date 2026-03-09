@@ -1,0 +1,5 @@
+apt-transport-github (0.1.0) UNRELEASED; urgency=medium
+
+  * Initial release.
+
+ -- Adam Sasine <asasine@users.noreply.github.com>  Mon, 09 Mar 2026 09:16:46 -0700

@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+# --- Variables ---
+MAN_DIR := target/man
+
+# To add new man pages, append the filename to this list
+MAN_PAGES := apt-transport-github.1
+
+# --- debhelper ---
+%:
+	dh $@
+
+
+execute_before_dh_installman: man
+
+# --- man pages ---
+$(MAN_DIR)/%: install/man/%.md | $(MAN_DIR)
+	go-md2man -in $< -out $@
+
+$(MAN_DIR):
+	mkdir -p $@
+
+.PHONY: man
+man: $(addprefix $(MAN_DIR)/,$(MAN_PAGES))
