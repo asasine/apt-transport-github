@@ -1,0 +1,51 @@
+#!/bin/bash
+# An APT transport method to log another method's stdin, stdout and stderr to a file
+#
+# Install as /usr/lib/apt/methods/log and symlink named log+<method> to it (e.g., log+https -> log).
+# Then use the corresponding URI scheme (e.g., log+http://) in sources.list to debug that method.
+#
+# Log files are written to /var/log/apt-transport-log/ by default.
+# Set APT_LOG_LOG_DIR to override.
+
+set -uo pipefail
+
+SELF_NAME=$(basename "$0")
+REAL_METHOD_NAME="${SELF_NAME#log+}"
+
+if [[ "$SELF_NAME" == "$REAL_METHOD_NAME" ]]; then
+    echo "Error: must be invoked as log+<method> (e.g., log+https -> log)" >&2
+    exit 1
+fi
+
+METHODS_DIR="/usr/lib/apt/methods"
+REAL_METHOD="$METHODS_DIR/$REAL_METHOD_NAME"
+
+if [[ ! -x "$REAL_METHOD" ]]; then
+    echo "Error: method not found or not executable: $REAL_METHOD" >&2
+    exit 1
+fi
+
+LOG_DIR="${APT_MITM_LOG_DIR:-/var/log/apt-transport-log}"
+mkdir -p "$LOG_DIR"
+
+TIMESTAMP=$(date +%Y%m%d-%H%M%S-%N)
+LOG_PREFIX="$LOG_DIR/${REAL_METHOD_NAME}-${TIMESTAMP}"
+
+# Create temporary FIFOs for capturing stdout and stderr
+FIFO_DIR=$(mktemp -d)
+trap 'rm -rf "$FIFO_DIR"' EXIT
+
+STDOUT_FIFO="$FIFO_DIR/stdout"
+STDERR_FIFO="$FIFO_DIR/stderr"
+mkfifo "$STDOUT_FIFO" "$STDERR_FIFO"
+
+# Background: tee stdout and stderr from the real method into log files
+tee "${LOG_PREFIX}.stdout" < "$STDOUT_FIFO" &
+tee "${LOG_PREFIX}.stderr" < "$STDERR_FIFO" >&2 &
+
+# Tee stdin into a log file and pipe it to the real method
+tee "${LOG_PREFIX}.stdin" | "$REAL_METHOD" >"$STDOUT_FIFO" 2>"$STDERR_FIFO"
+RC=${PIPESTATUS[1]}
+
+wait
+exit "$RC"
