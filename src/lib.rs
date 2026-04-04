@@ -1,6 +1,7 @@
 use std::io::{Stderr, Stdin, Stdout};
 
 pub mod message;
+pub(crate) mod utilities;
 
 pub struct Fds {
     pub stdin: Stdin,
