@@ -1,5 +1,6 @@
 use apt_transport_github::message::{
-    self, InformationalHeader, InformationalMessage, Message, OutboundHeader, RequestMessage,
+    self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
+    RequestMessage,
 };
 use core::fmt::Display;
 use std::io::{BufRead, Stderr, Stdin, Stdout, Write};
@@ -107,6 +108,13 @@ impl Method {
                 let last_modified = message.fields.find("Last-Modified");
 
                 self.uri_failure(uri, filename, last_modified);
+            }
+            message::RequestHeader::AuthorizationCredentials
+            | message::RequestHeader::MediaChanged => {
+                self.send_message(message::log(format!(
+                    "Received unsupported message: {}",
+                    message.header.display()
+                )))?;
             }
             _ => {}
         }
