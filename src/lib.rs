@@ -1,7 +1,10 @@
 use std::io::{Stderr, Stdin, Stdout};
 
 pub mod message;
+mod uri;
 pub(crate) mod utilities;
+
+pub use uri::Uri;
 
 pub struct Fds {
     pub stdin: Stdin,

@@ -1,12 +1,15 @@
 use apt_transport_github::{
-    Fds,
+    Fds, Uri,
     message::{
         self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
         RequestMessage,
     },
 };
 use core::fmt::Display;
-use std::io::{BufRead, Write};
+use std::{
+    io::{BufRead, Write},
+    path::{Path, PathBuf},
+};
 
 #[derive(Default)]
 struct Method {
@@ -48,7 +51,10 @@ impl Method {
     ///
     /// This is not part of the protocol and does not require a specific format.
     /// Any message can be sent.
-    #[allow(dead_code, reason = "Not always used depending on the state of the implementation.")]
+    #[allow(
+        dead_code,
+        reason = "Not always used depending on the state of the implementation."
+    )]
     fn error(&mut self, message: impl Display) {
         let _ = writeln!(self.fds.stderr, "{}", message);
     }
@@ -82,21 +88,7 @@ impl Method {
 
     fn handle_message(&mut self, message: RequestMessage) -> std::io::Result<()> {
         match message.header {
-            message::RequestHeader::UriAcquire => {
-                let uri = message.fields.find("URI").ok_or(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "URI field not provided",
-                ))?;
-
-                let filename = message.fields.find("Filename").ok_or(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Filename field not provided",
-                ))?;
-
-                let last_modified = message.fields.find("Last-Modified");
-
-                self.uri_failure(uri, filename, last_modified);
-            }
+            message::RequestHeader::UriAcquire => self.acquire_uri(message)?,
             message::RequestHeader::AuthorizationCredentials
             | message::RequestHeader::MediaChanged => {
                 self.send_message(message::log(format!(
@@ -110,14 +102,47 @@ impl Method {
         Ok(())
     }
 
-    fn uri_failure(&mut self, uri: &str, filename: &str, last_modified: Option<&str>) {
-        let message = format!(
-            "URI acquisition failed for URI: \"{}\", filename: \"{}\", last modified: \"{:?}\": not implemented yet",
-            uri, filename, last_modified
-        );
+    /// Acquire the URI indicated by the message.
+    fn acquire_uri(&mut self, message: RequestMessage) -> std::io::Result<()> {
+        let uri = message.fields.find("URI").ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "URI field not provided",
+        ))?;
 
-        self.send_message(message::uri_failure(uri, message))
-            .unwrap();
+        let uri = Uri::from_uri(uri).ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "URI field is not in the expected format",
+        ))?;
+
+        if uri.path == "Packages" {
+            let filename =
+                message
+                    .fields
+                    .find("Filename")
+                    .map(PathBuf::from)
+                    .ok_or(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Filename field not provided",
+                    ))?;
+
+            return self.acquire_packages(uri, &filename);
+        }
+
+        // all other URIs are unsupported
+        self.send_message(message::uri_failure(uri.original, "Not supported"))
+    }
+
+    /// Acquire the `Packages` file from the given URI and save it to the given filename.
+    fn acquire_packages(&mut self, uri: Uri, filename: &Path) -> std::io::Result<()> {
+        self.send_message(message::status(format!(
+            "Fetching list of packages from {}",
+            uri.display_repository(),
+        )))?;
+
+        self.send_message(message::uri_failure(
+            uri.original,
+            "Packages not supported yet",
+        ))
     }
 }
 
