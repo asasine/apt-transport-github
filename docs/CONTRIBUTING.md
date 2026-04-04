@@ -15,3 +15,15 @@ Manual pages in [install/man/](../install/man/) are in mardown and converted to 
 # view it
 man -l target/man/apt-transport-github.1
 ```
+
+## Local development
+
+```bash
+# run unit tests
+cargo test
+```
+
+```bash
+# build and install local version
+cargo build --release && sudo make /usr/lib/apt/methods/github
+```

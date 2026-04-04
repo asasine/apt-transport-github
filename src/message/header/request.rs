@@ -87,3 +87,31 @@ impl InboundHeader for RequestHeader {}
 // Even though these are technically inbound headers, implementing this trait allows
 // us to print them using the same code as outbound headers.
 impl OutboundHeader for RequestHeader {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod from_str {
+        use super::*;
+
+        #[test]
+        fn code_description() {
+            assert_eq!("600 URI Acquire".parse(), Ok(RequestHeader::UriAcquire));
+            assert_eq!(
+                "601 Configuration".parse(),
+                Ok(RequestHeader::Configuration)
+            );
+            assert_eq!(
+                "602 Authorization Credentials".parse(),
+                Ok(RequestHeader::AuthorizationCredentials)
+            );
+            assert_eq!("603 Media Changed".parse(), Ok(RequestHeader::MediaChanged));
+        }
+
+        #[test]
+        fn invalid() {
+            assert_eq!("999 Invalid".parse::<RequestHeader>(), Err(()));
+        }
+    }
+}
