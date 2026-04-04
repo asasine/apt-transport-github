@@ -21,7 +21,10 @@ impl<H: OutboundHeader> Display for RefMessage<'_, H> {
 
 impl<'a, H> From<&'a Message<H>> for RefMessage<'a, H> {
     fn from(message: &'a Message<H>) -> Self {
-        RefMessage { header: &message.header, fields: &message.fields }
+        RefMessage {
+            header: &message.header,
+            fields: &message.fields,
+        }
     }
 }
 
@@ -61,5 +64,16 @@ mod tests {
                 "400 URI Failure\nURI: http://example.com\nMessage: not found\n"
             );
         }
+    }
+
+    #[test]
+    fn from() {
+        let msg = Message {
+            header: InformationalHeader::Status,
+            fields: vec![("Message", "downloading")].into_iter().collect(),
+        };
+        let ref_msg = RefMessage::from(&msg);
+        assert_eq!(ref_msg.header, &msg.header);
+        assert_eq!(ref_msg.fields, &msg.fields);
     }
 }
