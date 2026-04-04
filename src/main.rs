@@ -1,25 +1,12 @@
-use apt_transport_github::message::{
-    self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
-    RequestMessage,
+use apt_transport_github::{
+    Fds,
+    message::{
+        self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
+        RequestMessage,
+    },
 };
 use core::fmt::Display;
-use std::io::{BufRead, Stderr, Stdin, Stdout, Write};
-
-struct Fds {
-    stdin: Stdin,
-    stdout: Stdout,
-    stderr: Stderr,
-}
-
-impl Default for Fds {
-    fn default() -> Self {
-        Self {
-            stdin: std::io::stdin(),
-            stdout: std::io::stdout(),
-            stderr: std::io::stderr(),
-        }
-    }
-}
+use std::io::{BufRead, Write};
 
 #[derive(Default)]
 struct Method {
@@ -61,6 +48,7 @@ impl Method {
     ///
     /// This is not part of the protocol and does not require a specific format.
     /// Any message can be sent.
+    #[allow(dead_code, reason = "Not always used depending on the state of the implementation.")]
     fn error(&mut self, message: impl Display) {
         let _ = writeln!(self.fds.stderr, "{}", message);
     }
