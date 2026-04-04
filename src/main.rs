@@ -1,5 +1,5 @@
 use apt_transport_github::{
-    Fds, Uri,
+    Fds, Uri, apt,
     message::{
         self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
         RequestMessage,
@@ -139,8 +139,9 @@ impl Method {
             uri.display_repository(),
         )))?;
 
+        let packages = apt::Packages::from_uri(uri);
         self.send_message(message::uri_failure(
-            uri.original,
+            &packages.uri().original,
             "Packages not supported yet",
         ))
     }

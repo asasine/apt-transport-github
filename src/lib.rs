@@ -1,5 +1,6 @@
 use std::io::{Stderr, Stdin, Stdout};
 
+pub mod apt;
 pub mod message;
 mod uri;
 pub(crate) mod utilities;
