@@ -1,15 +1,14 @@
-mod request;
 mod failure;
-mod success;
 mod informational;
+mod request;
+mod success;
 
-pub use request::RequestHeader;
 pub use failure::FailureHeader;
-pub use success::SuccessHeader;
 pub use informational::InformationalHeader;
+pub use request::RequestHeader;
+pub use success::SuccessHeader;
 
 use core::{fmt::Display, str::FromStr};
-
 
 pub trait Header {
     fn code(&self) -> u16;
