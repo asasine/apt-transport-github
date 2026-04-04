@@ -24,3 +24,42 @@ impl<'a, H> From<&'a Message<H>> for RefMessage<'a, H> {
         RefMessage { header: &message.header, fields: &message.fields }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::{InformationalHeader, FailureHeader};
+
+    mod display {
+        use super::*;
+
+        #[test]
+        fn no_fields() {
+            let header = InformationalHeader::Capabilities;
+            let fields = Fields::default();
+            let msg = RefMessage { header: &header, fields: &fields };
+            assert_eq!(msg.to_string(), "100 Capabilities\n");
+        }
+
+        #[test]
+        fn single_field() {
+            let header = InformationalHeader::Log;
+            let fields: Fields = vec![("Message", "hello")].into_iter().collect();
+            let msg = RefMessage { header: &header, fields: &fields };
+            assert_eq!(msg.to_string(), "101 Log\nMessage: hello\n");
+        }
+
+        #[test]
+        fn multiple_fields() {
+            let header = FailureHeader::UriFailure;
+            let fields: Fields = vec![("URI", "http://example.com"), ("Message", "not found")]
+                .into_iter()
+                .collect();
+            let msg = RefMessage { header: &header, fields: &fields };
+            assert_eq!(
+                msg.to_string(),
+                "400 URI Failure\nURI: http://example.com\nMessage: not found\n"
+            );
+        }
+    }
+}

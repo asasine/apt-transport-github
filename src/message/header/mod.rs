@@ -30,3 +30,25 @@ pub trait Header {
 
 pub trait InboundHeader: Header + FromStr {}
 pub trait OutboundHeader: Header {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display() {
+        struct TestHeader;
+        impl Header for TestHeader {
+            fn code(&self) -> u16 {
+                123
+            }
+
+            fn description(&self) -> &'static str {
+                "Test Header"
+            }
+        }
+
+        let header = TestHeader;
+        assert_eq!(header.display().to_string(), "123 Test Header");
+    }
+}
