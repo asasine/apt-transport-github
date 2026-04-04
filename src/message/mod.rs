@@ -26,12 +26,13 @@
 //! to the remote server. It should be noted however that APT will buffer messages
 //! so it is not necessary for the method to be constantly ready to receive them.
 
+mod factories;
 mod fields;
 mod header;
 mod owned;
 mod r#ref;
-mod factories;
 
+pub use factories::*;
 use fields::Fields;
 pub use header::{
     FailureHeader, Header, InboundHeader, InformationalHeader, OutboundHeader, RequestHeader,
@@ -39,7 +40,6 @@ pub use header::{
 };
 pub use owned::Message;
 pub use r#ref::RefMessage;
-pub use factories::*;
 
 /// An informational message sent by the method to the APT parent process.
 pub type InformationalMessage = Message<InformationalHeader>;

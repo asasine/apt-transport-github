@@ -15,7 +15,9 @@ pub fn capabilities() -> InformationalMessage {
 pub fn log(message: impl Into<String>) -> InformationalMessage {
     InformationalMessage {
         header: InformationalHeader::Log,
-        fields: [("Message".to_string(), message.into())].into_iter().collect(),
+        fields: [("Message".to_string(), message.into())]
+            .into_iter()
+            .collect(),
     }
 }
 
@@ -23,7 +25,9 @@ pub fn log(message: impl Into<String>) -> InformationalMessage {
 pub fn status(message: impl Into<String>) -> InformationalMessage {
     InformationalMessage {
         header: InformationalHeader::Status,
-        fields: [("Message".to_string(), message.into())].into_iter().collect(),
+        fields: [("Message".to_string(), message.into())]
+            .into_iter()
+            .collect(),
     }
 }
 
@@ -44,6 +48,8 @@ pub fn uri_failure(uri: impl Into<String>, message: impl Into<String>) -> Failur
 pub fn general_failure(message: impl Into<String>) -> FailureMessage {
     FailureMessage {
         header: FailureHeader::GeneralFailure,
-        fields: [("Message".to_string(), message.into())].into_iter().collect(),
+        fields: [("Message".to_string(), message.into())]
+            .into_iter()
+            .collect(),
     }
 }

@@ -90,7 +90,9 @@ mod tests {
 
         #[test]
         fn multiple_fields() {
-            let fields: Fields = vec![("Key", "Value1"), ("Key", "Value2")].into_iter().collect();
+            let fields: Fields = vec![("Key", "Value1"), ("Key", "Value2")]
+                .into_iter()
+                .collect();
             assert_eq!(fields.find("Key"), Some("Value1"));
         }
 
@@ -113,7 +115,9 @@ mod tests {
 
         #[test]
         fn multiple_fields() {
-            let fields: Fields = vec![("Key", "Value1"), ("Key", "Value2")].into_iter().collect();
+            let fields: Fields = vec![("Key", "Value1"), ("Key", "Value2")]
+                .into_iter()
+                .collect();
             let values: Vec<&str> = fields.find_all("Key").collect();
             assert_eq!(values, vec!["Value1", "Value2"]);
         }
