@@ -1,15 +1,23 @@
 use core::fmt::Display;
 use std::sync::LazyLock;
 
+/// A parsed URI from the `URI` field of a `600 URI Acquire` message.
 pub struct Uri {
+    /// The original URI string as received in the message.
     pub original: String,
-    pub user: String,
+
+    /// The GitHub username or organization owning the repository.
+    pub owner: String,
+
+    /// The GitHub repository name.
     pub repo: String,
+
+    /// The path to the resource within the repository.
     pub path: String,
 }
 
 impl Uri {
-    /// Parse a URI from the `URI` field of a `600 URI-Acquire` message.
+    /// Parse a URI from the `URI` field of a `600 URI Acquire` message.
     ///
     /// The URI is expected to be in the format: `github://{user}/{repo}/./{path}`
     ///
@@ -17,17 +25,17 @@ impl Uri {
     pub fn from_uri(uri: impl Into<String>) -> Option<Self> {
         let uri = uri.into();
         static GITHUB_URI_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
-            regex::Regex::new(r"^github://(?P<user>[^/]+)/(?P<repo>[^/]+)/\./(?P<path>.+)$")
+            regex::Regex::new(r"^github://(?P<owner>[^/]+)/(?P<repo>[^/]+)/\./(?P<path>.+)$")
                 .unwrap()
         });
 
         let captures = GITHUB_URI_REGEX.captures(&uri)?;
-        let user = captures.name("user")?.as_str().to_string();
+        let owner = captures.name("owner")?.as_str().to_string();
         let repo = captures.name("repo")?.as_str().to_string();
         let path = captures.name("path")?.as_str().to_string();
         Some(Self {
             original: uri,
-            user,
+            owner,
             repo,
             path,
         })
@@ -35,18 +43,18 @@ impl Uri {
 
     pub fn display_repository(&self) -> impl Display {
         struct RepoDisplay<'a> {
-            user: &'a str,
+            owner: &'a str,
             repo: &'a str,
         }
 
         impl Display for RepoDisplay<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}/{}", self.user, self.repo)
+                write!(f, "{}/{}", self.owner, self.repo)
             }
         }
 
         RepoDisplay {
-            user: &self.user,
+            owner: &self.owner,
             repo: &self.repo,
         }
     }
@@ -58,10 +66,10 @@ mod tests {
 
     #[test]
     fn from_uri() {
-        let uri = "github://user/repo/./path/to/file";
+        let uri = "github://owner/repo/./path/to/file";
         let parsed = Uri::from_uri(uri).unwrap();
         assert_eq!(parsed.original, uri);
-        assert_eq!(parsed.user, "user");
+        assert_eq!(parsed.owner, "owner");
         assert_eq!(parsed.repo, "repo");
         assert_eq!(parsed.path, "path/to/file");
     }
