@@ -37,45 +37,30 @@ impl Display for PackagesFile<'_> {
 }
 
 /// An individual package in a repository.
+///
+/// The `control` field holds the verbatim content of the `.deb`'s `DEBIAN/control`
+/// file. The index-specific fields (`Filename`, `Size`, `SHA256`) are appended
+/// when serializing to a `Packages` stanza.
 struct Package {
-    package: String,
-    architecture: String,
-    version: String,
-    priority: String,
-    section: String,
-    maintainer: String,
-    installed_size: String,
-    depends: String,
-    recommends: String,
+    /// The raw content of the `DEBIAN/control` file from the `.deb`.
+    control: String,
+
+    /// Path to the `.deb` file relative to the repository root.
     filename: String,
+
+    /// Size of the `.deb` file in bytes in its compressed/packaged form.
     size: String,
-    md5sum: String,
-    sha1: String,
+
+    /// SHA-256 checksum of the `.deb` file.
     sha256: String,
-    sha512: String,
-    homepage: String,
-    description: String,
 }
 
 impl Display for Package {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Package: {}", self.package)?;
-        writeln!(f, "Architecture: {}", self.architecture)?;
-        writeln!(f, "Version: {}", self.version)?;
-        writeln!(f, "Priority: {}", self.priority)?;
-        writeln!(f, "Section: {}", self.section)?;
-        writeln!(f, "Maintainer: {}", self.maintainer)?;
-        writeln!(f, "Installed-Size: {}", self.installed_size)?;
-        writeln!(f, "Depends: {}", self.depends)?;
-        writeln!(f, "Recommends: {}", self.recommends)?;
+        write!(f, "{}", self.control)?;
         writeln!(f, "Filename: {}", self.filename)?;
         writeln!(f, "Size: {}", self.size)?;
-        writeln!(f, "MD5sum: {}", self.md5sum)?;
-        writeln!(f, "SHA1: {}", self.sha1)?;
-        writeln!(f, "SHA256: {}", self.sha256)?;
-        writeln!(f, "SHA512: {}", self.sha512)?;
-        writeln!(f, "Homepage: {}", self.homepage)?;
-        write!(f, "Description: {}", self.description)
+        write!(f, "SHA256: {}", self.sha256)
     }
 }
 
@@ -87,83 +72,60 @@ mod tests {
     fn packages_file() {
         let packages = vec![
             Package {
-                package: "example1".to_string(),
-                architecture: "amd64".to_string(),
-                version: "1.0.0".to_string(),
-                priority: "optional".to_string(),
-                section: "utils".to_string(),
-                maintainer: "Example Maintainer <example@example.com>".to_string(),
-                installed_size: "1024".to_string(),
-                depends: "libexample1 (>= 1.0), libexample2 (>= 2.0)".to_string(),
-                recommends: "libexample3 (>= 3.0)".to_string(),
+                control: r#"Package: example1
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Example Maintainer <example@example.com>
+Description: An example package
+Installed-Size: 1024
+Depends: libexample1 (>= 1.0), libexample2 (>= 2.0)
+Recommends: libexample3 (>= 3.0)
+"#
+                .to_string(),
                 filename: "pool/main/e/example/example1_1.0.0_amd64.deb".to_string(),
                 size: "2048".to_string(),
-                md5sum: "d41d8cd98f00b204e980099ecf8427e".to_string(),
-                sha1: "da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string(),
                 sha256: "e3b0c44298fc1c149afbf49daeaeeae4e8f1b2b0b822cd15d6bf511a6f5".to_string(),
-                sha512: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d6c15b0f00a08".to_string(),
-                homepage: "https://example.com".to_string(),
-                description: "An example package".to_string(),
             },
             Package {
-                package: "example2".to_string(),
-                architecture: "amd64".to_string(),
-                version: "1.0.0".to_string(),
-                priority: "optional".to_string(),
-                section: "utils".to_string(),
-                maintainer: "Example Maintainer <example@example.com>".to_string(),
-                installed_size: "1024".to_string(),
-                depends: "libexample1 (>= 1.0), libexample2 (>= 2.0)".to_string(),
-                recommends: "libexample3 (>= 3.0)".to_string(),
+                control: r#"Package: example2
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Example Maintainer <example@example.com>
+Description: An example package
+Multi-Arch: same
+"#
+                .to_string(),
                 filename: "pool/main/e/example/example2_1.0.0_amd64.deb".to_string(),
                 size: "2048".to_string(),
-                md5sum: "d41d8cd98f00b204e980099ecf8427e".to_string(),
-                sha1: "da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string(),
                 sha256: "e3b0c44298fc1c149afbf49daeaeeae4e8f1b2b0b822cd15d6bf511a6f5".to_string(),
-                sha512: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d6c15b0f00a08".to_string(),
-                homepage: "https://example.com".to_string(),
-                description: "An example package".to_string(),
-            }
+            },
         ];
 
         let packages_file = PackagesFile(&packages);
 
-        let expected = r#"Package: example1
-Architecture: amd64
+        let expected = "\
+Package: example1
 Version: 1.0.0
-Priority: optional
-Section: utils
+Architecture: amd64
 Maintainer: Example Maintainer <example@example.com>
+Description: An example package
 Installed-Size: 1024
 Depends: libexample1 (>= 1.0), libexample2 (>= 2.0)
 Recommends: libexample3 (>= 3.0)
 Filename: pool/main/e/example/example1_1.0.0_amd64.deb
 Size: 2048
-MD5sum: d41d8cd98f00b204e980099ecf8427e
-SHA1: da39a3ee5e6b4b0d3255bfef95601890afd80709
 SHA256: e3b0c44298fc1c149afbf49daeaeeae4e8f1b2b0b822cd15d6bf511a6f5
-SHA512: cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d6c15b0f00a08
-Homepage: https://example.com
-Description: An example package
 
 Package: example2
-Architecture: amd64
 Version: 1.0.0
-Priority: optional
-Section: utils
+Architecture: amd64
 Maintainer: Example Maintainer <example@example.com>
-Installed-Size: 1024
-Depends: libexample1 (>= 1.0), libexample2 (>= 2.0)
-Recommends: libexample3 (>= 3.0)
+Description: An example package
+Multi-Arch: same
 Filename: pool/main/e/example/example2_1.0.0_amd64.deb
 Size: 2048
-MD5sum: d41d8cd98f00b204e980099ecf8427e
-SHA1: da39a3ee5e6b4b0d3255bfef95601890afd80709
 SHA256: e3b0c44298fc1c149afbf49daeaeeae4e8f1b2b0b822cd15d6bf511a6f5
-SHA512: cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d6c15b0f00a08
-Homepage: https://example.com
-Description: An example package
-"#;
+";
         assert_eq!(packages_file.to_string(), expected);
     }
 }
