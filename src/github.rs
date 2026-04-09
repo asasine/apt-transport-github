@@ -18,6 +18,7 @@ pub struct Release {
 /// A release asset.
 #[derive(Debug, Deserialize)]
 pub struct Asset {
+    pub id: u64,
     pub name: String,
     pub size: u64,
     pub url: String,
@@ -61,7 +62,7 @@ pub fn list_releases(user: &str, repo: &str) -> Result<Vec<Release>, Error> {
 /// show that `control.tar.*` extends beyond the fetched bytes, a second Range
 /// request fetches the remainder.
 pub fn fetch_control_bytes(asset: &Asset) -> Result<Vec<u8>, Error> {
-    let url = &asset.browser_download_url;
+    let url = &asset.url;
 
     // First request: speculative 64 KiB
     let initial_end = INITIAL_RANGE_BYTES.min(asset.size as usize) - 1;
@@ -111,7 +112,24 @@ fn needs_more_bytes(data: &[u8]) -> bool {
 
 fn fetch_range(url: &str, start: usize, end: usize) -> Result<Vec<u8>, Error> {
     let range = format!("bytes={start}-{end}");
-    let response = ureq::get(url).header("Range", &range).call()?;
+    let response = ureq::get(url)
+        .header("Accept", "application/octet-stream")
+        .header("Range", &range)
+        .call()?;
+
+    let buf = response.into_body().read_to_vec()?;
+    Ok(buf)
+}
+
+/// Download a full release asset by its ID.
+///
+/// Uses the REST API endpoint with `Accept: application/octet-stream`, which
+/// returns a 302 redirect to the actual file.
+pub fn download_asset(owner: &str, repo: &str, asset_id: u64) -> Result<Vec<u8>, Error> {
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}");
+    let response = ureq::get(&url)
+        .header("Accept", "application/octet-stream")
+        .call()?;
 
     let buf = response.into_body().read_to_vec()?;
     Ok(buf)
@@ -155,6 +173,7 @@ mod tests {
             "tag_name": "v1.0.0",
             "assets": [
                 {
+                    "id": 1,
                     "name": "example_1.0.0_amd64.deb",
                     "size": 123456,
                     "url": "https://api.github.com/repos/user/repo/releases/assets/1",
@@ -163,6 +182,7 @@ mod tests {
                     "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
                 },
                 {
+                    "id": 2,
                     "name": "example_1.0.0_amd64.tar.gz",
                     "size": 654321,
                     "url": "https://api.github.com/repos/user/repo/releases/assets/2",
@@ -203,6 +223,7 @@ mod tests {
     #[test]
     fn asset_sha256_missing_digest() {
         let asset = Asset {
+            id: 0,
             name: "test.deb".to_string(),
             size: 100,
             url: String::new(),

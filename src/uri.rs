@@ -73,4 +73,13 @@ mod tests {
         assert_eq!(parsed.repo, "repo");
         assert_eq!(parsed.path, "path/to/file");
     }
+
+    #[test]
+    fn from_uri_asset() {
+        let uri = "github://owner/repo/./assets/12345";
+        let parsed = Uri::from_uri(uri).unwrap();
+        assert_eq!(parsed.owner, "owner");
+        assert_eq!(parsed.repo, "repo");
+        assert_eq!(parsed.path, "assets/12345");
+    }
 }

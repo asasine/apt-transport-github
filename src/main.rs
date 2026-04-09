@@ -1,5 +1,5 @@
 use apt_transport_github::{
-    Fds, Method, Uri, apt,
+    Fds, Method, Uri, apt, github,
     message::{
         self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
         RequestMessage,
@@ -100,6 +100,20 @@ impl AptMethod {
             return self.acquire_packages(uri, &filename);
         }
 
+        if let Some(asset_id) = uri.path.strip_prefix("assets/").map(str::to_string) {
+            let filename =
+                message
+                    .fields
+                    .find("Filename")
+                    .map(PathBuf::from)
+                    .ok_or(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Filename field not provided",
+                    ))?;
+
+            return self.acquire_asset(uri, &asset_id, &filename);
+        }
+
         // all other URIs are unsupported
         self.send_message(message::uri_failure(uri.original, "Not supported"))
     }
@@ -115,6 +129,29 @@ impl AptMethod {
         match apt::Packages::from_uri(uri) {
             Ok(packages) => {
                 std::fs::write(filename, packages.into_packages_file())?;
+                self.send_message(message::uri_done(&uri_original, filename.to_string_lossy()))
+            }
+            Err(e) => self.send_message(message::uri_failure(&uri_original, e.to_string())),
+        }
+    }
+
+    /// Acquire a release asset (`.deb` file) and save it to the given filename.
+    fn acquire_asset(
+        &mut self,
+        uri: Uri,
+        asset_id: &str,
+        filename: &Path,
+    ) -> std::io::Result<()> {
+        let asset_id: u64 = asset_id.parse().map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid asset ID")
+        })?;
+
+        self.send_message(message::uri_start(&uri.original))?;
+
+        let uri_original = uri.original.clone();
+        match github::download_asset(&uri.owner, &uri.repo, asset_id) {
+            Ok(bytes) => {
+                std::fs::write(filename, bytes)?;
                 self.send_message(message::uri_done(&uri_original, filename.to_string_lossy()))
             }
             Err(e) => self.send_message(message::uri_failure(&uri_original, e.to_string())),

@@ -26,7 +26,7 @@ impl Packages {
 
                 packages.push(Package {
                     control,
-                    filename: asset.url.clone(),
+                    filename: format!("./assets/{}", asset.id),
                     size: asset.size.to_string(),
                     sha256,
                 });
