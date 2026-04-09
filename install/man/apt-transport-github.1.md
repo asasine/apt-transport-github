@@ -8,18 +8,10 @@ apt-transport-github - APT transport for downloading packages from GitHub releas
 
 # SYNOPSIS
 
-DEB822 format:
-
 ```
 Types: deb
 URIs: github://owner/repo
-Suites: suite
-```
-
-One-line format:
-
-```
-deb github://owner/repo suite
+Suites: ./
 ```
 
 # DESCRIPTION
@@ -35,20 +27,12 @@ releases in the specified repository.
 
 # SOURCES LIST FORMAT
 
-The transport supports both the one-line and DEB822 **sources.list**(5) formats.
-
-DEB822 format:
-
 ```
 Types: deb
 URIs: github://owner/repo
-Suites: suite
-```
-
-One-line format:
-
-```
-deb github://owner/repo suite
+Suites: ./
+Trusted: yes
+Languages: none
 ```
 
 *owner*
@@ -57,23 +41,16 @@ deb github://owner/repo suite
 *repo*
 :   The name of the GitHub repository containing the releases.
 
-*suite*
-:   The suite/distribution name (e.g., **stable**, **bookworm**).
-
 # EXAMPLES
 
-Install packages from a public GitHub repository (deb822 format):
+Install packages from a public GitHub repository:
 
 ```
 Types: deb
 URIs: github://exampleuser/mypackages
-Suites: stable
-```
-
-The same in one-line format:
-
-```
-deb github://exampleuser/mypackages stable
+Suites: ./
+Trusted: yes
+Languages: none
 ```
 
 # SEE ALSO

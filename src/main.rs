@@ -1,70 +1,36 @@
-use apt_transport_github::message::{
-    self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
-    RequestMessage,
+use apt_transport_github::{
+    Fds, Method, Uri, apt, github,
+    message::{
+        self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
+        RequestMessage,
+    },
 };
 use core::fmt::Display;
-use std::io::{BufRead, Stderr, Stdin, Stdout, Write};
-
-struct Fds {
-    stdin: Stdin,
-    stdout: Stdout,
-    stderr: Stderr,
-}
-
-impl Default for Fds {
-    fn default() -> Self {
-        Self {
-            stdin: std::io::stdin(),
-            stdout: std::io::stdout(),
-            stderr: std::io::stderr(),
-        }
-    }
-}
+use std::path::{Path, PathBuf};
 
 #[derive(Default)]
-struct Method {
+struct AptMethod {
     fds: Fds,
 }
 
-impl Method {
-    /// Read an inbound request message from stdin until a blank line is encountered.
-    fn receive_message(&mut self) -> std::io::Result<RequestMessage> {
-        let mut buffer = String::new();
-        let mut stdin = self.fds.stdin.lock();
-        loop {
-            let bytes_read = stdin.read_line(&mut buffer)?;
-            if bytes_read == 0 {
-                // EOF
-                break;
-            }
+/// Implement the APT transport method for [`Method`] by delegating to the [`Self::fds`].
+impl Method for AptMethod {
+    type Error = <Fds as Method>::Error;
 
-            if bytes_read == 1 && buffer.as_bytes().last().is_some_and(|&last| last == b'\n') {
-                // Blank line indicates end of message
-                break;
-            }
-        }
-
-        let message = buffer.trim().parse().map_err(|()| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid message format")
-        })?;
-
-        Ok(message)
+    fn receive_message(&mut self) -> Result<RequestMessage, Self::Error> {
+        self.fds.receive_message()
     }
 
-    /// Send an outbound message to stdout.
-    fn send_message(&mut self, message: Message<impl OutboundHeader>) -> std::io::Result<()> {
-        writeln!(self.fds.stdout, "{}", message)?;
-        self.fds.stdout.flush()
+    fn send_message(&mut self, message: Message<impl OutboundHeader>) -> Result<(), Self::Error> {
+        self.fds.send_message(message)
     }
 
-    /// Send an emergency error message to stderr.
-    ///
-    /// This is not part of the protocol and does not require a specific format.
-    /// Any message can be sent.
     fn error(&mut self, message: impl Display) {
-        let _ = writeln!(self.fds.stderr, "{}", message);
+        self.fds.error(message)
     }
+}
 
+impl AptMethod {
     /// Run the method, which reads messages from stdin until EOF.
     ///
     /// The flow of messages is as follows:
@@ -94,21 +60,7 @@ impl Method {
 
     fn handle_message(&mut self, message: RequestMessage) -> std::io::Result<()> {
         match message.header {
-            message::RequestHeader::UriAcquire => {
-                let uri = message.fields.find("URI").ok_or(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "URI field not provided",
-                ))?;
-
-                let filename = message.fields.find("Filename").ok_or(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Filename field not provided",
-                ))?;
-
-                let last_modified = message.fields.find("Last-Modified");
-
-                self.uri_failure(uri, filename, last_modified);
-            }
+            message::RequestHeader::UriAcquire => self.acquire_uri(message)?,
             message::RequestHeader::AuthorizationCredentials
             | message::RequestHeader::MediaChanged => {
                 self.send_message(message::log(format!(
@@ -122,18 +74,96 @@ impl Method {
         Ok(())
     }
 
-    fn uri_failure(&mut self, uri: &str, filename: &str, last_modified: Option<&str>) {
-        let message = format!(
-            "URI acquisition failed for URI: \"{}\", filename: \"{}\", last modified: \"{:?}\": not implemented yet",
-            uri, filename, last_modified
-        );
+    /// Acquire the URI indicated by the message.
+    fn acquire_uri(&mut self, message: RequestMessage) -> std::io::Result<()> {
+        let uri = message.fields.find("URI").ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "URI field not provided",
+        ))?;
 
-        self.send_message(message::uri_failure(uri, message))
-            .unwrap();
+        let uri = Uri::from_uri(uri).ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "URI field is not in the expected format",
+        ))?;
+
+        match uri.path.as_str() {
+            "Packages" => {
+                let filename = message.fields.find("Filename").map(PathBuf::from).ok_or(
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Filename field not provided",
+                    ),
+                )?;
+
+                self.acquire_packages(uri, &filename)
+            }
+            path if path.starts_with("assets/") => {
+                let asset_id = path.trim_start_matches("assets/").to_string();
+                let filename = message.fields.find("Filename").map(PathBuf::from).ok_or(
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Filename field not provided",
+                    ),
+                )?;
+
+                self.acquire_asset(uri, &asset_id, &filename)
+            }
+            "InRelease" | "Release" => {
+                // ignore unsupported index files
+                self.send_message(message::uri_done(&uri.original, String::new()))
+            }
+            path if path.starts_with("Packages.") => {
+                // ignore compressed Packages files
+                self.send_message(message::uri_failure(
+                    &uri.original,
+                    "Compressed Packages files are not supported",
+                ))
+            }
+            _ => {
+                // all other URIs are unsupported
+                self.send_message(message::uri_failure(uri.original, "Not supported"))
+            }
+        }
+    }
+
+    /// Acquire the `Packages` file from the given URI and save it to the given filename.
+    fn acquire_packages(&mut self, uri: Uri, filename: &Path) -> std::io::Result<()> {
+        self.send_message(message::uri_start(&uri.original))?;
+        self.send_message(message::status(format!(
+            "Fetching list of packages from {}",
+            uri.display_repository(),
+        )))?;
+
+        let uri_original = uri.original.clone();
+        match apt::Packages::from_uri(uri) {
+            Ok(packages) => {
+                std::fs::write(filename, packages.into_packages_file())?;
+                self.send_message(message::uri_done(&uri_original, filename.to_string_lossy()))
+            }
+            Err(e) => self.send_message(message::uri_failure(&uri_original, e.to_string())),
+        }
+    }
+
+    /// Acquire a release asset (`.deb` file) and save it to the given filename.
+    fn acquire_asset(&mut self, uri: Uri, asset_id: &str, filename: &Path) -> std::io::Result<()> {
+        let asset_id: u64 = asset_id.parse().map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid asset ID")
+        })?;
+
+        self.send_message(message::uri_start(&uri.original))?;
+
+        let uri_original = uri.original.clone();
+        match github::download_asset(&uri.owner, &uri.repo, asset_id) {
+            Ok(bytes) => {
+                std::fs::write(filename, bytes)?;
+                self.send_message(message::uri_done(&uri_original, filename.to_string_lossy()))
+            }
+            Err(e) => self.send_message(message::uri_failure(&uri_original, e.to_string())),
+        }
     }
 }
 
 fn main() -> std::io::Result<()> {
-    let method = Method::default();
+    let method = AptMethod::default();
     method.run()
 }
