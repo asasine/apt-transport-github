@@ -10,6 +10,14 @@ MAN_PAGES := apt-transport-github.1
 %:
 	dh $@
 
+override_dh_auto_build:
+	cargo build --release
+
+override_dh_auto_test:
+	cargo test --release
+
+execute_before_dh_install:
+	cp target/release/apt-transport-github target/release/github
 
 execute_before_dh_installman: man
 

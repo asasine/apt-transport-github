@@ -20,10 +20,4 @@ APT will request for the method to obtain the `Packages` file from the repositor
 
 Since this file isn't provided by GitHub Releases automatically, the transport method will synthesize one from information contained in the GitHub Release. This file is then stored in APT's variable state directory and parsed by it to determine packages available to install.
 
-Each stanza in the `Packages` file has a `Filename` key, which this method sets to the download URL of that asset, which allows the method to fetch the asset when requested by APT.
-
-```
-https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}
-```
-
-The `{asset_id}` is found in the response to various [Releases REST API requests](https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10). Each asset that has a `content_type` of `application/x-debian-package` is included.
+Each stanza in the `Packages` file has a `Filename` key, which this method sets to the asset ID of that asset, which allows the method to fetch the asset when requested by APT. The asset ID is found in the response to various [Releases REST API requests](https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10). Each asset that has a `content_type` of `application/x-debian-package` is included.

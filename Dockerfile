@@ -1,4 +1,4 @@
-FROM debian:latest AS build
+FROM rust:latest AS build
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -17,7 +17,8 @@ RUN apt-get update \
 
 # Copy the rest of the source code to the build the binary package
 COPY . .
-RUN dpkg-buildpackage -b -uc -us
+RUN --mount=type=cache,target=/build/sources/target \
+    dpkg-buildpackage -b -uc -us
 
 RUN mkdir /dist && mv ../*.deb /dist/
 
