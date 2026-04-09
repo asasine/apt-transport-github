@@ -114,7 +114,10 @@ impl AptMethod {
             }
             path if path.starts_with("Packages.") => {
                 // ignore compressed Packages files
-                self.send_message(message::uri_failure(&uri.original, "Compressed Packages files are not supported"))
+                self.send_message(message::uri_failure(
+                    &uri.original,
+                    "Compressed Packages files are not supported",
+                ))
             }
             _ => {
                 // all other URIs are unsupported
@@ -125,6 +128,7 @@ impl AptMethod {
 
     /// Acquire the `Packages` file from the given URI and save it to the given filename.
     fn acquire_packages(&mut self, uri: Uri, filename: &Path) -> std::io::Result<()> {
+        self.send_message(message::uri_start(&uri.original))?;
         self.send_message(message::status(format!(
             "Fetching list of packages from {}",
             uri.display_repository(),
