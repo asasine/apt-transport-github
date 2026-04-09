@@ -72,10 +72,11 @@ pub fn fetch_control_bytes(asset: &Asset) -> Result<Vec<u8>, Error> {
     if needs_more_bytes(&buf) {
         // Parse ar headers to find where control.tar.* ends
         if let Some(needed) = control_tar_end_offset(&buf)
-            && needed > buf.len() {
-                let mut rest = fetch_range(url, buf.len(), needed - 1)?;
-                buf.append(&mut rest);
-            }
+            && needed > buf.len()
+        {
+            let mut rest = fetch_range(url, buf.len(), needed - 1)?;
+            buf.append(&mut rest);
+        }
     }
 
     Ok(buf)
