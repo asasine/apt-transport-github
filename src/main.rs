@@ -86,36 +86,41 @@ impl AptMethod {
             "URI field is not in the expected format",
         ))?;
 
-        if uri.path == "Packages" {
-            let filename =
-                message
-                    .fields
-                    .find("Filename")
-                    .map(PathBuf::from)
-                    .ok_or(std::io::Error::new(
+        match uri.path.as_str() {
+            "Packages" => {
+                let filename = message.fields.find("Filename").map(PathBuf::from).ok_or(
+                    std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "Filename field not provided",
-                    ))?;
+                    ),
+                )?;
 
-            return self.acquire_packages(uri, &filename);
-        }
-
-        if let Some(asset_id) = uri.path.strip_prefix("assets/").map(str::to_string) {
-            let filename =
-                message
-                    .fields
-                    .find("Filename")
-                    .map(PathBuf::from)
-                    .ok_or(std::io::Error::new(
+                self.acquire_packages(uri, &filename)
+            }
+            path if path.starts_with("assets/") => {
+                let asset_id = path.trim_start_matches("assets/").to_string();
+                let filename = message.fields.find("Filename").map(PathBuf::from).ok_or(
+                    std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "Filename field not provided",
-                    ))?;
+                    ),
+                )?;
 
-            return self.acquire_asset(uri, &asset_id, &filename);
+                self.acquire_asset(uri, &asset_id, &filename)
+            }
+            "InRelease" | "Release" => {
+                // ignore unsupported index files
+                self.send_message(message::uri_done(&uri.original, String::new()))
+            }
+            path if path.starts_with("Packages.") => {
+                // ignore compressed Packages files
+                self.send_message(message::uri_failure(&uri.original, "Compressed Packages files are not supported"))
+            }
+            _ => {
+                // all other URIs are unsupported
+                self.send_message(message::uri_failure(uri.original, "Not supported"))
+            }
         }
-
-        // all other URIs are unsupported
-        self.send_message(message::uri_failure(uri.original, "Not supported"))
     }
 
     /// Acquire the `Packages` file from the given URI and save it to the given filename.
@@ -136,12 +141,7 @@ impl AptMethod {
     }
 
     /// Acquire a release asset (`.deb` file) and save it to the given filename.
-    fn acquire_asset(
-        &mut self,
-        uri: Uri,
-        asset_id: &str,
-        filename: &Path,
-    ) -> std::io::Result<()> {
+    fn acquire_asset(&mut self, uri: Uri, asset_id: &str, filename: &Path) -> std::io::Result<()> {
         let asset_id: u64 = asset_id.parse().map_err(|_| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid asset ID")
         })?;
