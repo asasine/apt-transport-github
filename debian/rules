@@ -16,6 +16,9 @@ override_dh_auto_build:
 override_dh_auto_test:
 	cargo test --release
 
+execute_before_dh_install:
+	cp target/release/apt-transport-github target/release/github
+
 execute_before_dh_installman: man
 
 # --- man pages ---
