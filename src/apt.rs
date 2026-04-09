@@ -1,6 +1,6 @@
 //! Contains types to create an APT Repository from a GitHub repository.
 
-use crate::{Uri, utilities::Rfc822};
+use crate::{Uri, deb, github, utilities::Rfc822};
 use core::fmt::Display;
 
 /// Contains the packages in a repository, for serializing to a `Packages` file.
@@ -10,13 +10,30 @@ pub struct Packages {
 }
 
 impl Packages {
-    pub fn from_uri(uri: Uri) -> Self {
-        // TODO: fetch packages from the repository releases
-        // TODO: create a `Package` for each release asset with .deb extension
-        Self {
-            uri,
-            packages: Default::default(),
+    pub fn from_uri(uri: Uri) -> Result<Self, Error> {
+        let releases = github::list_releases(&uri.owner, &uri.repo)?;
+        let mut packages = Vec::new();
+
+        for release in &releases {
+            for asset in &release.assets {
+                if !asset.is_deb() {
+                    continue;
+                }
+
+                let bytes = github::fetch_control_bytes(asset)?;
+                let control = deb::extract_control(&bytes)?;
+                let sha256 = asset.sha256().unwrap_or_default().to_string();
+
+                packages.push(Package {
+                    control,
+                    filename: asset.url.clone(),
+                    size: asset.size.to_string(),
+                    sha256,
+                });
+            }
         }
+
+        Ok(Self { uri, packages })
     }
 
     pub const fn uri(&self) -> &Uri {
@@ -61,6 +78,35 @@ impl Display for Package {
         writeln!(f, "Filename: {}", self.filename)?;
         writeln!(f, "Size: {}", self.size)?;
         write!(f, "SHA256: {}", self.sha256)
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    Github(github::Error),
+    Deb(deb::Error),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Github(e) => write!(f, "GitHub API error: {e}"),
+            Self::Deb(e) => write!(f, "deb extraction error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<github::Error> for Error {
+    fn from(e: github::Error) -> Self {
+        Self::Github(e)
+    }
+}
+
+impl From<deb::Error> for Error {
+    fn from(e: deb::Error) -> Self {
+        Self::Deb(e)
     }
 }
 

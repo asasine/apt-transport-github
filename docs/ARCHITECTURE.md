@@ -12,7 +12,7 @@ Messages are sent in RFC-822 format. Each is identified by a 3-digit Status Code
 
 #### 600 URI Acquire
 
-APT will request new URIs through the `600 URI Acquire` message. This includes packages, as specified in the repository indices, and the [package index](https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices) itself.
+APT will request new URIs through the `600 URI Acquire` message. This includes packages, as specified in the repository indices, and the [package index](#packages-index-file) itself.
 
 ##### `Packages` index file
 

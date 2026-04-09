@@ -1,7 +1,10 @@
 //! This module contains factory functions for creating messages with specific headers
 //! and fields.
 
-use crate::message::{FailureHeader, FailureMessage, InformationalHeader, InformationalMessage};
+use crate::message::{
+    FailureHeader, FailureMessage, InformationalHeader, InformationalMessage, SuccessHeader,
+    SuccessMessage,
+};
 
 /// Create a Capabilities message with no fields.
 pub fn capabilities() -> InformationalMessage {
@@ -28,6 +31,27 @@ pub fn status(message: impl Into<String>) -> InformationalMessage {
         fields: [("Message".to_string(), message.into())]
             .into_iter()
             .collect(),
+    }
+}
+
+/// Create a URI Start message indicating the start of acquiring a URI with the given `uri`.
+pub fn uri_start(uri: impl Into<String>) -> SuccessMessage {
+    SuccessMessage {
+        header: SuccessHeader::UriStart,
+        fields: [("URI".to_string(), uri.into())].into_iter().collect(),
+    }
+}
+
+/// Create a URI Done message indicating a URI has been successfully acquired.
+pub fn uri_done(uri: impl Into<String>, filename: impl Into<String>) -> SuccessMessage {
+    SuccessMessage {
+        header: SuccessHeader::UriDone,
+        fields: [
+            ("URI".to_string(), uri.into()),
+            ("Filename".to_string(), filename.into()),
+        ]
+        .into_iter()
+        .collect(),
     }
 }
 

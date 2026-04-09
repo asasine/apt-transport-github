@@ -1,64 +1,36 @@
 use apt_transport_github::{
-    Fds, Uri, apt,
+    Fds, Method, Uri, apt,
     message::{
         self, Header, InformationalHeader, InformationalMessage, Message, OutboundHeader,
         RequestMessage,
     },
 };
 use core::fmt::Display;
-use std::{
-    io::{BufRead, Write},
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 #[derive(Default)]
-struct Method {
+struct AptMethod {
     fds: Fds,
 }
 
-impl Method {
-    /// Read an inbound request message from stdin until a blank line is encountered.
-    fn receive_message(&mut self) -> std::io::Result<RequestMessage> {
-        let mut buffer = String::new();
-        let mut stdin = self.fds.stdin.lock();
-        loop {
-            let bytes_read = stdin.read_line(&mut buffer)?;
-            if bytes_read == 0 {
-                // EOF
-                break;
-            }
+/// Implement the APT transport method for [`Method`] by delegating to the [`Self::fds`].
+impl Method for AptMethod {
+    type Error = <Fds as Method>::Error;
 
-            if bytes_read == 1 && buffer.as_bytes().last().is_some_and(|&last| last == b'\n') {
-                // Blank line indicates end of message
-                break;
-            }
-        }
-
-        let message = buffer.trim().parse().map_err(|()| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid message format")
-        })?;
-
-        Ok(message)
+    fn receive_message(&mut self) -> Result<RequestMessage, Self::Error> {
+        self.fds.receive_message()
     }
 
-    /// Send an outbound message to stdout.
-    fn send_message(&mut self, message: Message<impl OutboundHeader>) -> std::io::Result<()> {
-        writeln!(self.fds.stdout, "{}", message)?;
-        self.fds.stdout.flush()
+    fn send_message(&mut self, message: Message<impl OutboundHeader>) -> Result<(), Self::Error> {
+        self.fds.send_message(message)
     }
 
-    /// Send an emergency error message to stderr.
-    ///
-    /// This is not part of the protocol and does not require a specific format.
-    /// Any message can be sent.
-    #[allow(
-        dead_code,
-        reason = "Not always used depending on the state of the implementation."
-    )]
     fn error(&mut self, message: impl Display) {
-        let _ = writeln!(self.fds.stderr, "{}", message);
+        self.fds.error(message)
     }
+}
 
+impl AptMethod {
     /// Run the method, which reads messages from stdin until EOF.
     ///
     /// The flow of messages is as follows:
@@ -139,15 +111,18 @@ impl Method {
             uri.display_repository(),
         )))?;
 
-        let packages = apt::Packages::from_uri(uri);
-        self.send_message(message::uri_failure(
-            &packages.uri().original,
-            "Packages not supported yet",
-        ))
+        let uri_original = uri.original.clone();
+        match apt::Packages::from_uri(uri) {
+            Ok(packages) => {
+                std::fs::write(filename, packages.into_packages_file())?;
+                self.send_message(message::uri_done(&uri_original, filename.to_string_lossy()))
+            }
+            Err(e) => self.send_message(message::uri_failure(&uri_original, e.to_string())),
+        }
     }
 }
 
 fn main() -> std::io::Result<()> {
-    let method = Method::default();
+    let method = AptMethod::default();
     method.run()
 }
