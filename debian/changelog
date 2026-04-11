@@ -1,5 +1,5 @@
-apt-transport-github (0.1.0) UNRELEASED; urgency=medium
+apt-transport-github (0.1.0) noble; urgency=medium
 
   * Initial release.
 
- -- Adam Sasine <asasine@users.noreply.github.com>  Mon, 09 Mar 2026 09:16:46 -0700
+ -- Adam Sasine <asasine@users.noreply.github.com>  Sat, 11 Apr 2026 22:33:16 +0000
