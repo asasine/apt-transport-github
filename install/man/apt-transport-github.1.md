@@ -53,6 +53,9 @@ Trusted: yes
 Languages: none
 ```
 
+- `Trusted: yes`: package index isn't signed by any GPG key.
+- `Languages: none`: skips downloading translation files, keeping APT logs less noisy
+
 # SEE ALSO
 
 **sources.list**(5)
